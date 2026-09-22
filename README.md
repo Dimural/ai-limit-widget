@@ -55,7 +55,7 @@ running AI Limits do not need it.
 ## Install
 
 ```bash
-git clone https://github.com/dimural/ai-limit-widget.git
+git clone https://github.com/Dimural/ai-limit-widget.git
 cd ai-limit-widget
 ./install.sh
 ```
