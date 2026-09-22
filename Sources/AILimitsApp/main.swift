@@ -34,6 +34,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+// Headless modes, used by scripts/uninstall.sh so removal works even when the
+// menu bar app cannot be clicked. They do their one job and exit without
+// starting any UI.
+switch CommandLine.arguments.dropFirst().first {
+case "--uninstall-hook":
+    try? ClaudeHookInstaller().uninstall()
+    exit(0)
+case "--print-snapshot":
+    // For debugging and for agents: the exact data the widget renders.
+    let paths = Paths()
+    if let data = try? Data(contentsOf: paths.snapshot) {
+        FileHandle.standardOutput.write(data)
+        print()
+    } else {
+        print("No snapshot yet.")
+    }
+    exit(0)
+default:
+    break
+}
+
 let application = NSApplication.shared
 let delegate = AppDelegate()
 application.delegate = delegate
