@@ -1,0 +1,17 @@
+# Build output
+.build/
+build/
+*.o
+*.dSYM/
+
+# Assembled bundles
+AILimits.app/
+*.appex/
+
+# macOS
+.DS_Store
+
+# Xcode (this project does not use an .xcodeproj; see AGENTS.md)
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/

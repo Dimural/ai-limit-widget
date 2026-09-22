@@ -1,0 +1,9 @@
+{
+  "capturedAt": "2026-09-22T02:14:33Z",
+  "rateLimits": {
+    "seven_day_sonnet": {
+      "used_percentage": 3.25,
+      "resets_at": "2026-09-28T05:00:00Z"
+    }
+  }
+}
