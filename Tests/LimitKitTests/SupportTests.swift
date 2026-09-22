@@ -14,11 +14,14 @@ final class RateLimitParsingTests: XCTestCase {
         )
     }
 
-    func testReadsISO8601WithAndWithoutFractionalSeconds() {
+    func testReadsISO8601WithAndWithoutFractionalSeconds() throws {
         let expected = ISO8601DateFormatter().date(from: "2026-08-05T04:19:41Z")
         XCTAssertEqual(RateLimitParsing.resetDate("2026-08-05T04:19:41Z"), expected)
-        XCTAssertEqual(RateLimitParsing.resetDate("2026-08-05T04:19:41.777Z"),
-                       expected?.addingTimeInterval(0.777))
+
+        let fractional = try XCTUnwrap(RateLimitParsing.resetDate("2026-08-05T04:19:41.777Z"))
+        XCTAssertEqual(
+            fractional.timeIntervalSince(try XCTUnwrap(expected)), 0.777, accuracy: 0.001
+        )
     }
 
     func testRejectsUnusableTimestamps() {

@@ -50,10 +50,18 @@ public struct SnapshotStore {
 
         let temporary = directory.appending(path: ".\(url.lastPathComponent).\(UUID().uuidString)")
         try data.write(to: temporary, options: .atomic)
-        try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: temporary.path)
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600], ofItemAtPath: temporary.path
+        )
 
-        // Replaces any existing file in one step; readers see either the old
-        // contents or the new ones, never a partial write.
-        _ = try FileManager.default.replaceItemAt(url, withItemAt: temporary)
+        // rename(2) rather than FileManager.replaceItemAt, which throws when
+        // the destination does not yet exist — the very first write. rename is
+        // atomic whether or not the destination is there, so a reader sees
+        // either the old contents or the new ones and never a partial file.
+        guard rename(temporary.path, url.path) == 0 else {
+            let code = errno
+            try? FileManager.default.removeItem(at: temporary)
+            throw NSError(domain: NSPOSIXErrorDomain, code: Int(code))
+        }
     }
 }

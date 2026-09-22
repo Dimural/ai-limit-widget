@@ -44,15 +44,17 @@ final class Collector {
     }
 
     func start() {
+        // First, so our own directory exists before a watcher is pointed at it.
+        refresh()
+
         // Codex writes rollout files here; the shim writes our capture file
         // there. Between them, every change that matters is covered.
         for directory in [paths.codexSessions, paths.appSupport] {
-            let watcher = DirectoryWatcher(url: directory) { [weak self] in
+            watchers.append(DirectoryWatcher(url: directory) { [weak self] in
                 Task { @MainActor in self?.refresh() }
-            }
-            watcher.start()
-            watchers.append(watcher)
+            })
         }
+        attachWatchers()
 
         heartbeatTimer = Timer.scheduledTimer(
             withTimeInterval: Self.heartbeat,
@@ -63,8 +65,14 @@ final class Collector {
         // The heartbeat only keeps the display honest; it must never wake a
         // sleeping Mac to do it.
         heartbeatTimer?.tolerance = Self.heartbeat / 2
+    }
 
-        refresh()
+    /// A directory that does not exist yet cannot be watched — a provider that
+    /// has never run, or our own directory before the first write. This is
+    /// retried on every heartbeat, so installing Codex later starts being
+    /// picked up without restarting the app. `start()` is idempotent.
+    private func attachWatchers() {
+        for watcher in watchers { watcher.start() }
     }
 
     func stop() {
@@ -80,6 +88,8 @@ final class Collector {
     /// only touched when the numbers actually changed, to stay inside
     /// WidgetKit's reload budget.
     func refresh() {
+        attachWatchers()
+
         let rebuilt = builder.build()
         let numbersChanged = rebuilt.providers != snapshot.providers
         snapshot = rebuilt

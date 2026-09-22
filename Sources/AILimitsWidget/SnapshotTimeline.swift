@@ -25,13 +25,13 @@ struct SnapshotTimelineProvider: TimelineProvider {
     private let paths = Paths()
 
     func placeholder(in context: Context) -> SnapshotEntry {
-        SnapshotEntry(date: Date(), snapshot: .preview)
+        SnapshotEntry(date: Date(), snapshot: Snapshot.preview)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (SnapshotEntry) -> Void) {
         // The widget gallery previews with `isPreview`, before any data has
         // been pushed; sample numbers show what the widget is for.
-        let snapshot = context.isPreview ? .preview : currentSnapshot()
+        let snapshot: Snapshot? = context.isPreview ? Snapshot.preview : currentSnapshot()
         completion(SnapshotEntry(date: Date(), snapshot: snapshot))
     }
 
