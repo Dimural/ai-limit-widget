@@ -21,24 +21,6 @@ import LimitKit
 
 /// A wrapped command that hangs would hang the status line, so it gets a
 /// bounded amount of time and is then abandoned.
-let wrappedCommandTimeout: TimeInterval = 5
-
-let paths = Paths()
-let payload = FileHandle.standardInput.readDataToEndOfFile()
-
-if let envelope = StatusLineCapture.envelope(fromStatusLinePayload: payload) {
-    try? SnapshotStore.writeAtomically(data: envelope, to: paths.claudeSnapshot)
-}
-
-let hookState = try? Data(contentsOf: paths.hookState)
-
-if let command = StatusLineCapture.wrappedCommand(fromHookState: hookState) {
-    runWrapped(command, feeding: payload)
-} else {
-    print(StatusLineCapture.summaryLine(fromStatusLinePayload: payload))
-}
-exit(0)
-
 /// Runs the user's own status line command with the same stdin Claude Code
 /// gave us, letting it write straight through to our stdout and stderr.
 ///
@@ -66,3 +48,21 @@ func runWrapped(_ command: String, feeding payload: Data) {
     }
     if process.isRunning { process.terminate() }
 }
+
+let wrappedCommandTimeout: TimeInterval = 5
+
+let paths = Paths()
+let payload = FileHandle.standardInput.readDataToEndOfFile()
+
+if let envelope = StatusLineCapture.envelope(fromStatusLinePayload: payload) {
+    try? SnapshotStore.writeAtomically(data: envelope, to: paths.claudeSnapshot)
+}
+
+let hookState = try? Data(contentsOf: paths.hookState)
+
+if let command = StatusLineCapture.wrappedCommand(fromHookState: hookState) {
+    runWrapped(command, feeding: payload)
+} else {
+    print(StatusLineCapture.summaryLine(fromStatusLinePayload: payload))
+}
+exit(0)

@@ -13,8 +13,8 @@ import WidgetKit
 struct AILimitsWidgetBundle: WidgetBundle {
     var body: some Widget {
         OverviewWidget()
-        ProviderWidget(provider: .claude)
-        ProviderWidget(provider: .codex)
+        ClaudeCodeWidget()
+        CodexWidget()
     }
 }
 
@@ -26,31 +26,41 @@ struct OverviewWidget: Widget {
             OverviewView(snapshot: entry.snapshot)
                 .containerBackground(.fill.tertiary, for: .widget)
         }
-        .configurationDisplayName("AI Limits")
-        .description("Usage windows for every connected AI CLI.")
+        .configurationDisplayName(Text("AI Limits"))
+        .description(Text("Usage windows for every connected AI CLI."))
         .supportedFamilies([.systemSmall, .systemMedium])
     }
 }
 
-/// A single provider, for people who only care about one.
-struct ProviderWidget: Widget {
-    let provider: ProviderID
+// A single provider, for people who only care about one.
+//
+// Two concrete types rather than one parameterised by provider: `Widget`
+// requires `init()`, so a widget cannot carry a stored property. The shared
+// builder below keeps that from turning into duplicated configuration.
 
-    var body: some WidgetConfiguration {
-        StaticConfiguration(
-            kind: "ai-limits-\(provider.rawValue)",
-            provider: SnapshotTimelineProvider()
-        ) { entry in
-            SingleProviderView(
-                provider: entry.snapshot?.provider(provider),
-                name: provider.displayName
-            )
-            .containerBackground(.fill.tertiary, for: .widget)
-        }
-        .configurationDisplayName(provider.displayName)
-        .description("Usage windows for \(provider.displayName).")
-        .supportedFamilies([.systemSmall, .systemMedium])
+struct ClaudeCodeWidget: Widget {
+    var body: some WidgetConfiguration { providerConfiguration(for: .claude) }
+}
+
+struct CodexWidget: Widget {
+    var body: some WidgetConfiguration { providerConfiguration(for: .codex) }
+}
+
+@MainActor
+private func providerConfiguration(for provider: ProviderID) -> some WidgetConfiguration {
+    StaticConfiguration(
+        kind: "ai-limits-\(provider.rawValue)",
+        provider: SnapshotTimelineProvider()
+    ) { entry in
+        SingleProviderView(
+            provider: entry.snapshot?.provider(provider),
+            name: provider.displayName
+        )
+        .containerBackground(.fill.tertiary, for: .widget)
     }
+    .configurationDisplayName(Text(provider.displayName))
+    .description(Text("Usage windows for \(provider.displayName)."))
+    .supportedFamilies([.systemSmall, .systemMedium])
 }
 
 // MARK: - Views
