@@ -108,8 +108,22 @@ make uninstall  remove the app, its data, and the Claude Code hook
 
 `make verify` is the definition of "did I break anything". There is no other.
 
+Useful while working:
+
+```
+./AILimits.app/Contents/MacOS/AILimits --print-snapshot   # what the widget sees
+pluginkit -m -p com.apple.widgetkit-extension | grep -i ailimits   # is it registered
+echo '<payload>' | ./AILimits.app/Contents/Resources/ai-limits-statusline
+```
+
 ## Requirements
 
-Xcode command line tools, macOS 14 or later. No Apple Developer account, no
-CocoaPods, no Homebrew, no other dependency — `Package.swift` has none and
-should keep having none.
+macOS 14 or later and the Xcode command line tools. No Apple Developer
+account, no CocoaPods, no Homebrew, no other dependency — `Package.swift` has
+none and should keep having none.
+
+**Full Xcode is required to run the tests**, and only for that: XCTest ships
+with Xcode, not with the command line tools. `swift build`, `make check` and
+`make app` all work without it, and `make test` says so plainly rather than
+failing with a wall of "no such module" errors. If you cannot run the tests in
+your environment, say so — do not claim the suite passed.

@@ -48,6 +48,10 @@ checks, not promises.
 
 No Apple Developer account. No Homebrew. No other dependencies.
 
+Full Xcode is needed only to run the test suite, because XCTest ships with
+Xcode rather than with the command line tools. Building, installing and
+running AI Limits do not need it.
+
 ## Install
 
 ```bash

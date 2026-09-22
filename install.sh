@@ -18,8 +18,17 @@ echo "==> Checking the safety invariants"
 ./scripts/check-safety.sh
 
 echo
-echo "==> Running tests"
-swift test
+# XCTest ships with full Xcode, not with the command line tools, so a
+# CLT-only machine can build and run AI Limits but cannot run its tests.
+# That is not a reason to refuse to install.
+XCTEST="$(xcode-select -p)/Platforms/MacOSX.platform/Developer/Library/Frameworks/XCTest.framework"
+if [ -d "$XCTEST" ]; then
+	echo "==> Running tests"
+	swift test
+else
+	echo "==> Skipping tests (XCTest needs full Xcode; the command line tools"
+	echo "    are enough to build and run AI Limits)"
+fi
 
 echo
 ./scripts/build-app.sh

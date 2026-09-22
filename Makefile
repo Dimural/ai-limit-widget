@@ -16,8 +16,8 @@ help: ## Show this help
 build: ## Compile every target
 	swift build
 
-test: ## Run the test suite
-	swift test
+test: ## Run the test suite (needs full Xcode, not just the CLT)
+	@./scripts/run-tests.sh
 
 check: ## Enforce the no-network / no-stray-writes invariants
 	@./scripts/check-safety.sh
