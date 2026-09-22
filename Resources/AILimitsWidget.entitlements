@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	macOS requires app extensions to be sandboxed. The widget needs no
+	capabilities of its own: it reads one JSON file that the menu bar app
+	pushes into this extension's own container, which the sandbox permits
+	without any additional entitlement. No network, no file access outside
+	the container, no App Group.
+	-->
+	<key>com.apple.security.app-sandbox</key>
+	<true/>
+</dict>
+</plist>
