@@ -59,7 +59,14 @@ public struct ProviderSnapshot: Codable, Hashable, Sendable {
     ) {
         self.provider = provider
         self.planLabel = planLabel
-        self.windows = windows.sorted { $0.usedPercent > $1.usedPercent }
+        // Tightest first, so the window about to stop the user working
+        // leads every display. Label breaks ties, so two windows at the same
+        // percentage keep a stable order instead of flickering between renders.
+        self.windows = windows.sorted {
+            $0.usedPercent == $1.usedPercent
+                ? $0.label < $1.label
+                : $0.usedPercent > $1.usedPercent
+        }
         self.sourceUpdatedAt = sourceUpdatedAt
     }
 

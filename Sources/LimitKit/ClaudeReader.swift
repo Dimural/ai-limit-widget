@@ -34,9 +34,9 @@ public struct ClaudeReader {
                   as? [String: Any]
         else { return nil }
 
+        // Ordering is ProviderSnapshot's job; this only needs to find them.
         let windows = limits
             .compactMap { key, value in window(named: key, from: value as? [String: Any]) }
-            .sorted { $0.label < $1.label }
         guard !windows.isEmpty else { return nil }
 
         let captured = RateLimitParsing.resetDate(
