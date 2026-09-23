@@ -15,11 +15,6 @@ final class Collector {
     /// at this interval the work is unmeasurable.
     private static let heartbeat: TimeInterval = 60
 
-    /// WidgetKit budgets how often a widget may reload, and spending that
-    /// budget on a busy session would leave none for later. Codex can write
-    /// several times a minute; the widget only needs the latest.
-    private static let minimumWidgetReloadInterval: TimeInterval = 60
-
     private let paths: Paths
     private let builder: SnapshotBuilder
     private let store = SnapshotStore()
@@ -27,8 +22,8 @@ final class Collector {
 
     private var watchers: [DirectoryWatcher] = []
     private var heartbeatTimer: Timer?
-    private var lastWidgetReload: Date = .distantPast
-    private var pendingWidgetReload = false
+    /// See `ReloadBudget`: WidgetKit limits how often a widget may reload.
+    private var reloadBudget = ReloadBudget()
 
     /// Latest snapshot, for the menu bar to render.
     private(set) var snapshot: Snapshot
@@ -108,23 +103,21 @@ final class Collector {
         reloadWidgetWithinBudget()
     }
 
-    /// Reloads at most once per interval, and makes sure the last change in a
-    /// burst is not the one that gets dropped.
+    /// Applies `ReloadBudget`'s decision. The waiting is all that lives here;
+    /// the rule itself is in LimitKit, where it is tested.
     private func reloadWidgetWithinBudget() {
-        let elapsed = Date().timeIntervalSince(lastWidgetReload)
-        guard elapsed >= Self.minimumWidgetReloadInterval else {
-            guard !pendingWidgetReload else { return }
-            pendingWidgetReload = true
-            let delay = Self.minimumWidgetReloadInterval - elapsed
+        switch reloadBudget.requestReload() {
+        case .reloadNow:
+            WidgetCenter.shared.reloadAllTimelines()
+        case .alreadyPending:
+            break
+        case .retryAfter(let delay):
             Task { @MainActor [weak self] in
                 try? await Task.sleep(for: .seconds(delay))
-                self?.pendingWidgetReload = false
-                self?.reloadWidgetWithinBudget()
+                guard let self else { return }
+                self.reloadBudget.retryCameDue()
+                self.reloadWidgetWithinBudget()
             }
-            return
         }
-
-        lastWidgetReload = Date()
-        WidgetCenter.shared.reloadAllTimelines()
     }
 }
