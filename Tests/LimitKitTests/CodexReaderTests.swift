@@ -40,7 +40,8 @@ final class CodexReaderTests: XCTestCase {
     }
 
     func testReturnsNilWhenNoEventCarriesLimits() throws {
-        XCTAssertNil(CodexReader.parse(rolloutLines: Fixture.lines("codex-no-rate-limits.jsonl")))
+        let lines = try Fixture.lines("codex-no-rate-limits.jsonl")
+        XCTAssertNil(CodexReader.parse(rolloutLines: lines))
     }
 
     func testReturnsNilForEmptyAndUnparseableInput() {
