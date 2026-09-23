@@ -46,7 +46,9 @@ struct CodexWidget: Widget {
     var body: some WidgetConfiguration { providerConfiguration(for: .codex) }
 }
 
-@MainActor
+// Deliberately not @MainActor: `Widget.body` is main-actor isolated on newer
+// SDKs and nonisolated on macOS 14's, and a nonisolated function can be called
+// from either.
 private func providerConfiguration(for provider: ProviderID) -> some WidgetConfiguration {
     StaticConfiguration(
         kind: "ai-limits-\(provider.rawValue)",

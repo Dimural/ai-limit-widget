@@ -51,7 +51,11 @@ final class Collector {
         // there. Between them, every change that matters is covered.
         for directory in [paths.codexSessions, paths.appSupport] {
             watchers.append(DirectoryWatcher(url: directory) { [weak self] in
-                Task { @MainActor in self?.refresh() }
+                // Bound before the Task: capturing the weak variable itself
+                // inside a concurrent closure is a data race, and older Swift
+                // toolchains reject it outright.
+                guard let self else { return }
+                Task { @MainActor in self.refresh() }
             })
         }
         attachWatchers()
@@ -60,7 +64,8 @@ final class Collector {
             withTimeInterval: Self.heartbeat,
             repeats: true
         ) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
+            guard let self else { return }
+            Task { @MainActor in self.refresh() }
         }
         // The heartbeat only keeps the display honest; it must never wake a
         // sleeping Mac to do it.
