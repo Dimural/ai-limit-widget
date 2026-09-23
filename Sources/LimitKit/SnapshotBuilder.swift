@@ -15,9 +15,34 @@ public struct SnapshotBuilder {
     }
 
     public func build(now: Date = Date()) -> Snapshot {
-        Snapshot(
+        let found = [claude.read()].compactMap { $0 } + codex.read(now: now)
+
+        return Snapshot(
             generatedAt: now,
-            providers: [claude.read(), codex.read()].compactMap { $0 }
+            providers: found.compactMap { withLiveWindowsOnly($0, now: now) }
+        )
+    }
+
+    /// Drops windows whose reset time has passed.
+    ///
+    /// Their percentage describes an allowance that has already rolled over,
+    /// and we have no reading of the replacement. A provider left with
+    /// nothing live is omitted entirely rather than quoting a number from a
+    /// window that no longer exists.
+    private func withLiveWindowsOnly(
+        _ snapshot: ProviderSnapshot,
+        now: Date
+    ) -> ProviderSnapshot? {
+        let live = snapshot.liveWindows(asOf: now)
+        guard !live.isEmpty else { return nil }
+        guard live.count != snapshot.windows.count else { return snapshot }
+
+        return ProviderSnapshot(
+            provider: snapshot.provider,
+            bucketName: snapshot.bucketName,
+            planLabel: snapshot.planLabel,
+            windows: live,
+            sourceUpdatedAt: snapshot.sourceUpdatedAt
         )
     }
 }

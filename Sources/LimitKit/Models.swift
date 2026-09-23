@@ -34,14 +34,31 @@ public struct LimitWindow: Codable, Hashable, Sendable {
 
     /// True once the provider says the window is fully consumed.
     public var isExhausted: Bool { usedPercent >= 100 }
+
+    /// True once the window's reset time has passed.
+    ///
+    /// The percentage then describes a window that no longer exists — the
+    /// allowance has already rolled over and we have no reading of the new
+    /// one. Showing it would be worse than showing nothing, so expired
+    /// windows are filtered out rather than displayed as current.
+    public func hasReset(asOf now: Date = Date()) -> Bool {
+        guard let resetsAt else { return false }
+        return resetsAt <= now
+    }
 }
 
 /// Everything AI Limits knows about one provider at a point in time.
 ///
 /// This is the *only* data that leaves a reader. No prompts, file paths,
 /// account identifiers, or tokens are ever carried in this type.
-public struct ProviderSnapshot: Codable, Hashable, Sendable {
+public struct ProviderSnapshot: Codable, Hashable, Sendable, Identifiable {
     public let provider: ProviderID
+    /// Names a distinct allowance within one provider. Codex reports separate
+    /// limits per model — "GPT-5.3-Codex-Spark" has its own windows, tracked
+    /// apart from plain Codex usage — and each gets its own card.
+    ///
+    /// `nil` for a provider's main allowance, which is the usual case.
+    public let bucketName: String?
     /// Subscription tier as the provider names it ("plus", "max"), when known.
     public let planLabel: String?
     /// Windows in the order they should be displayed, tightest first.
@@ -53,11 +70,13 @@ public struct ProviderSnapshot: Codable, Hashable, Sendable {
 
     public init(
         provider: ProviderID,
+        bucketName: String? = nil,
         planLabel: String?,
         windows: [LimitWindow],
         sourceUpdatedAt: Date
     ) {
         self.provider = provider
+        self.bucketName = bucketName
         self.planLabel = planLabel
         // Tightest first, so the window about to stop the user working
         // leads every display. Label breaks ties, so two windows at the same
@@ -70,9 +89,31 @@ public struct ProviderSnapshot: Codable, Hashable, Sendable {
         self.sourceUpdatedAt = sourceUpdatedAt
     }
 
+    /// Stable across refreshes, so a card keeps its place instead of
+    /// reshuffling when a second allowance appears.
+    public var id: String {
+        bucketName.map { "\(provider.rawValue):\($0)" } ?? provider.rawValue
+    }
+
+    /// What to call this card. A named allowance uses its own name, since
+    /// "Codex" twice over would tell the reader nothing.
+    public var title: String { bucketName ?? provider.displayName }
+
     /// The window closest to being exhausted, which is what the menu bar and
     /// the small widget lead with.
     public var tightestWindow: LimitWindow? { windows.first }
+
+    /// Windows that still describe a live allowance. See `LimitWindow.hasReset`.
+    public func liveWindows(asOf now: Date = Date()) -> [LimitWindow] {
+        windows.filter { !$0.hasReset(asOf: now) }
+    }
+
+    /// True when every window has already rolled over, so there is nothing
+    /// truthful left to show. The card reports when it last heard anything
+    /// instead of quoting a percentage from a window that no longer exists.
+    public func hasOnlyExpiredWindows(asOf now: Date = Date()) -> Bool {
+        !windows.isEmpty && liveWindows(asOf: now).isEmpty
+    }
 
     /// True when any window is fully consumed, i.e. requests are being refused.
     public var isLimitReached: Bool { windows.contains(where: \.isExhausted) }
@@ -106,7 +147,14 @@ public struct Snapshot: Codable, Hashable, Sendable {
         self.providers = providers
     }
 
+    /// A provider's main allowance, used by the single-provider widgets.
     public func provider(_ id: ProviderID) -> ProviderSnapshot? {
-        providers.first { $0.provider == id }
+        providers.first { $0.provider == id && $0.bucketName == nil }
+            ?? providers.first { $0.provider == id }
+    }
+
+    /// Every allowance belonging to one provider, main and named.
+    public func allowances(of id: ProviderID) -> [ProviderSnapshot] {
+        providers.filter { $0.provider == id }
     }
 }

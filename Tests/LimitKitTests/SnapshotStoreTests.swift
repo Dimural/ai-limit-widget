@@ -106,6 +106,8 @@ final class SnapshotBuilderTests: XCTestCase {
 
     func testCombinesEveryProviderThatHasData() throws {
         let home = try TemporaryHome()
+        // Before every window in these fixtures resets, so all of them are live.
+        let whileWindowsAreLive = Date(timeIntervalSince1970: 1_783_300_000)
         try home.write(
             String(decoding: try Fixture.data("claude-capture-two-windows.json"), as: UTF8.self),
             to: "Library/Application Support/AILimits/claude.json"
@@ -115,7 +117,7 @@ final class SnapshotBuilderTests: XCTestCase {
             to: ".codex/sessions/2026/09/22/rollout-x.jsonl"
         )
 
-        let snapshot = SnapshotBuilder(paths: home.paths).build()
+        let snapshot = SnapshotBuilder(paths: home.paths).build(now: whileWindowsAreLive)
 
         XCTAssertEqual(snapshot.providers.count, 2)
         XCTAssertNotNil(snapshot.provider(.claude))
@@ -258,7 +260,9 @@ final class RoundTripFidelityTests: XCTestCase {
             to: ".codex/sessions/2026/09/22/rollout-x.jsonl"
         )
 
-        let built = SnapshotBuilder(paths: home.paths).build()
+        let built = SnapshotBuilder(paths: home.paths).build(
+            now: Date(timeIntervalSince1970: 1_783_300_000)
+        )
         let store = SnapshotStore()
         try store.write(built, to: home.paths.snapshot)
 
@@ -267,5 +271,105 @@ final class RoundTripFidelityTests: XCTestCase {
 
         // And therefore the collector sees no change and does not rewrite.
         XCTAssertFalse(try store.writeIfChanged(built, to: home.paths.snapshot))
+    }
+}
+
+/// A window's percentage only means anything until the window resets. After
+/// that the allowance has rolled over and we have no reading of the new one,
+/// so quoting the old number would be worse than showing nothing.
+final class ExpiredWindowTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_790_000_000)
+
+    private func window(resetsIn offset: TimeInterval) -> LimitWindow {
+        LimitWindow(label: "5-hour", usedPercent: 40, resetsAt: now.addingTimeInterval(offset))
+    }
+
+    func testAWindowIsExpiredOnceItsResetTimeHasPassed() {
+        XCTAssertFalse(window(resetsIn: 60).hasReset(asOf: now))
+        XCTAssertTrue(window(resetsIn: -60).hasReset(asOf: now))
+        // The instant it comes due, the old reading no longer applies.
+        XCTAssertTrue(window(resetsIn: 0).hasReset(asOf: now))
+    }
+
+    /// Codex sometimes reports no reset time. Without one there is nothing to
+    /// say the reading is out of date, so it stands.
+    func testAWindowWithNoResetTimeNeverExpires() {
+        let open = LimitWindow(label: "Usage", usedPercent: 40, resetsAt: nil)
+        XCTAssertFalse(open.hasReset(asOf: now))
+    }
+
+    func testOnlyTheExpiredWindowIsDropped() {
+        let snapshot = ProviderSnapshot(
+            provider: .claude,
+            planLabel: nil,
+            windows: [window(resetsIn: -60), LimitWindow(label: "Weekly", usedPercent: 12,
+                                                         resetsAt: now.addingTimeInterval(86_400))],
+            sourceUpdatedAt: now
+        )
+
+        XCTAssertEqual(snapshot.liveWindows(asOf: now).map(\.label), ["Weekly"])
+        XCTAssertFalse(snapshot.hasOnlyExpiredWindows(asOf: now))
+    }
+
+    func testAnAllowanceWithNothingLiveLeftIsFlagged() {
+        let snapshot = ProviderSnapshot(
+            provider: .codex,
+            planLabel: nil,
+            windows: [window(resetsIn: -60)],
+            sourceUpdatedAt: now
+        )
+
+        XCTAssertTrue(snapshot.hasOnlyExpiredWindows(asOf: now))
+    }
+
+    /// The builder is where this is enforced, so nothing expired ever reaches
+    /// the snapshot on disk.
+    func testTheBuilderDropsCodexOnceItsWindowsHaveRolledOver() throws {
+        let home = try TemporaryHome()
+        try home.write(
+            try Fixture.lines("codex-both-windows.jsonl").joined(separator: "\n"),
+            to: ".codex/sessions/2026/09/22/rollout-x.jsonl"
+        )
+
+        XCTAssertTrue(
+            SnapshotBuilder(paths: home.paths).build(now: now).providers.isEmpty,
+            "Windows that reset weeks ago must not be reported as current usage"
+        )
+    }
+}
+
+final class AllowanceIdentityTests: XCTestCase {
+    private func allowance(bucket: String?) -> ProviderSnapshot {
+        ProviderSnapshot(
+            provider: .codex,
+            bucketName: bucket,
+            planLabel: nil,
+            windows: [LimitWindow(label: "Weekly", usedPercent: 1, resetsAt: nil)],
+            sourceUpdatedAt: Date()
+        )
+    }
+
+    /// Cards are keyed by this, so two Codex allowances must not collide.
+    func testNamedAndMainAllowancesHaveDistinctIdentities() {
+        XCTAssertNotEqual(allowance(bucket: nil).id, allowance(bucket: "Spark").id)
+        XCTAssertEqual(allowance(bucket: nil).id, "codex")
+        XCTAssertEqual(allowance(bucket: "Spark").id, "codex:Spark")
+    }
+
+    /// "Codex" twice over would tell the reader nothing.
+    func testANamedAllowanceIsTitledByItsOwnName() {
+        XCTAssertEqual(allowance(bucket: nil).title, "Codex")
+        XCTAssertEqual(allowance(bucket: "GPT-5.3-Codex-Spark").title, "GPT-5.3-Codex-Spark")
+    }
+
+    func testSnapshotFindsTheMainAllowanceAndAlsoListsEveryOne() {
+        let snapshot = Snapshot(
+            generatedAt: Date(),
+            providers: [allowance(bucket: "Spark"), allowance(bucket: nil)]
+        )
+
+        XCTAssertNil(snapshot.provider(.codex)?.bucketName, "The main allowance leads")
+        XCTAssertEqual(snapshot.allowances(of: .codex).count, 2)
+        XCTAssertTrue(snapshot.allowances(of: .claude).isEmpty)
     }
 }

@@ -14,13 +14,46 @@ public enum CodexSessionLocator {
     private static let maxDatedDirectoriesToTry = 30
 
     public static func newestRollout(in sessionsDirectory: URL) -> URL? {
-        let dayDirectories = datedDirectories(under: sessionsDirectory)
-        for directory in dayDirectories.prefix(maxDatedDirectoriesToTry) {
-            if let newest = newestRolloutFile(directlyIn: directory) { return newest }
-        }
-        // Layout changed, or sessions sit directly in the root.
-        return newestRolloutFile(directlyIn: sessionsDirectory)
+        recentRollouts(in: sessionsDirectory, modifiedSince: .distantPast, limit: 1).first
     }
+
+    /// Rollout files touched since `modifiedSince`, newest first.
+    ///
+    /// Codex reports a separate allowance per model, and they live in
+    /// different session files — so finding them all means looking at more
+    /// than the newest file. `modifiedSince` keeps that bounded: an allowance
+    /// from before the longest window has already rolled over and has nothing
+    /// current to tell us, so there is no reason to read it.
+    public static func recentRollouts(
+        in sessionsDirectory: URL,
+        modifiedSince: Date,
+        limit: Int = maxFilesToRead
+    ) -> [URL] {
+        var found: [(url: URL, modified: Date)] = []
+
+        for directory in datedDirectories(under: sessionsDirectory).prefix(maxDatedDirectoriesToTry) {
+            let candidates = rolloutFiles(directlyIn: directory)
+                .filter { $0.modified >= modifiedSince }
+            found.append(contentsOf: candidates)
+            if found.count >= limit { break }
+        }
+
+        // Layout changed, or sessions sit directly in the root.
+        if found.isEmpty {
+            found = rolloutFiles(directlyIn: sessionsDirectory)
+                .filter { $0.modified >= modifiedSince }
+        }
+
+        return found
+            .sorted { $0.modified > $1.modified }
+            .prefix(limit)
+            .map(\.url)
+    }
+
+    /// A ceiling on work, not a meaningful limit: a week of sessions is
+    /// nowhere near this many, and reading is skipped entirely for files
+    /// older than the longest window.
+    public static let maxFilesToRead = 40
 
     /// Year/month/day directories, newest first. Names are compared as strings
     /// because Codex zero-pads them, which makes lexicographic order correct.
@@ -47,7 +80,7 @@ public enum CodexSessionLocator {
             .sorted { $0.lastPathComponent > $1.lastPathComponent }
     }
 
-    private static func newestRolloutFile(directlyIn directory: URL) -> URL? {
+    private static func rolloutFiles(directlyIn directory: URL) -> [(url: URL, modified: Date)] {
         let contents = (try? FileManager.default.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: [.contentModificationDateKey],
@@ -56,7 +89,7 @@ public enum CodexSessionLocator {
 
         return contents
             .filter { $0.lastPathComponent.hasSuffix(".jsonl") }
-            .max { lhs, rhs in modificationDate(of: lhs) < modificationDate(of: rhs) }
+            .map { ($0, modificationDate(of: $0)) }
     }
 
     private static func modificationDate(of url: URL) -> Date {
