@@ -193,7 +193,7 @@ final class MenuBarController: NSObject {
     /// The shim ships inside this app bundle. When running from the build
     /// directory there is no bundle, so the built binary beside us is used
     /// instead — that is how `make run` works during development.
-    private static func shimPath() -> URL {
+    static func shimPath() -> URL {
         if let bundled = Bundle.main.url(
             forResource: ClaudeHookInstaller.shimExecutableName,
             withExtension: nil

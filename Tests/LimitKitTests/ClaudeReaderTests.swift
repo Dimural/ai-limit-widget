@@ -2,6 +2,9 @@ import XCTest
 
 @testable import LimitKit
 
+/// `claude-capture-two-windows.json` is a payload captured from a live Claude
+/// Code session, so these tests assert against the shape Claude Code really
+/// emits rather than one derived from documentation.
 final class ClaudeReaderTests: XCTestCase {
     func testReadsBothWindows() throws {
         let snapshot = try XCTUnwrap(
@@ -12,7 +15,23 @@ final class ClaudeReaderTests: XCTestCase {
         XCTAssertEqual(Set(snapshot.windows.map(\.label)), ["5-hour", "Weekly"])
 
         let fiveHour = try XCTUnwrap(snapshot.windows.first { $0.label == "5-hour" })
-        XCTAssertEqual(fiveHour.usedPercent, 42.5, accuracy: 0.001)
+        XCTAssertEqual(fiveHour.usedPercent, 29, accuracy: 0.001)
+
+        let weekly = try XCTUnwrap(snapshot.windows.first { $0.label == "Weekly" })
+        XCTAssertEqual(weekly.usedPercent, 5, accuracy: 0.001)
+    }
+
+    /// The capture records when it was taken, and staleness is measured from
+    /// it — not from when the widget happened to read the file.
+    func testTakesItsTimestampFromTheCapture() throws {
+        let snapshot = try XCTUnwrap(
+            ClaudeReader.parse(captureFile: try Fixture.data("claude-capture-two-windows.json"))
+        )
+
+        XCTAssertEqual(
+            snapshot.sourceUpdatedAt,
+            ISO8601DateFormatter().date(from: "2026-09-23T00:08:02Z")
+        )
     }
 
     /// Claude Code adds and removes windows as plans change. An unrecognised
@@ -26,21 +45,27 @@ final class ClaudeReaderTests: XCTestCase {
         XCTAssertEqual(snapshot.windows[0].usedPercent, 3.25, accuracy: 0.001)
     }
 
-    /// Reset times arrive as ISO-8601 in one window and Unix seconds in
-    /// another; both must land on the same timeline.
-    func testAcceptsBothResetTimestampFormats() throws {
+    /// Claude Code sends Unix seconds today. The parser also accepts ISO-8601
+    /// so that a change of format costs nothing, which is cheap insurance on a
+    /// third-party payload we do not control.
+    func testAcceptsUnixResetTimestamps() throws {
         let snapshot = try XCTUnwrap(
             ClaudeReader.parse(captureFile: try Fixture.data("claude-capture-two-windows.json"))
         )
 
         let fiveHour = try XCTUnwrap(snapshot.windows.first { $0.label == "5-hour" })
-        let weekly = try XCTUnwrap(snapshot.windows.first { $0.label == "Weekly" })
+        XCTAssertEqual(fiveHour.resetsAt, Date(timeIntervalSince1970: 1_790_137_800))
+    }
+
+    func testAcceptsISO8601ResetTimestamps() throws {
+        let snapshot = try XCTUnwrap(
+            ClaudeReader.parse(captureFile: try Fixture.data("claude-capture-iso-timestamps.json"))
+        )
 
         XCTAssertEqual(
-            fiveHour.resetsAt,
+            snapshot.windows.first?.resetsAt,
             ISO8601DateFormatter().date(from: "2026-09-22T05:00:00Z")
         )
-        XCTAssertEqual(weekly.resetsAt, Date(timeIntervalSince1970: 1_790_000_000))
     }
 
     func testFlagsAnExhaustedWindow() throws {
@@ -86,6 +111,6 @@ final class ClaudeReaderTests: XCTestCase {
             ClaudeReader.parse(captureFile: try Fixture.data("claude-capture-two-windows.json"))
         )
 
-        XCTAssertEqual(snapshot.tightestWindow?.label, "5-hour")
+        XCTAssertEqual(snapshot.tightestWindow?.label, "5-hour")  // 29% vs 5%
     }
 }

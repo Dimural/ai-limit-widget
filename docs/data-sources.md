@@ -27,8 +27,8 @@ that install step exists.
 
 ### The payload
 
-Claude Code pipes a document shaped roughly like this. Only `rate_limits` is
-ever extracted:
+Claude Code pipes a document shaped like this. Only `rate_limits` is ever
+extracted:
 
 ```json
 {
@@ -37,11 +37,16 @@ ever extracted:
   "cwd": "…",
   "model": { "id": "claude-opus-5", "display_name": "Opus" },
   "rate_limits": {
-    "five_hour": { "used_percentage": 42.5, "resets_at": "2026-09-22T05:00:00Z" },
-    "seven_day": { "used_percentage": 18,   "resets_at": "2026-09-28T05:00:00Z" }
+    "five_hour": { "used_percentage": 29, "resets_at": 1790137800 },
+    "seven_day": { "used_percentage": 5,  "resets_at": 1790618400 }
   }
 }
 ```
+
+The `rate_limits` object above is a real capture, kept verbatim in
+`Tests/LimitKitTests/Fixtures/claude-capture-two-windows.json`. `resets_at`
+arrives as Unix seconds; the parser also accepts ISO-8601, which costs nothing
+and covers a format change we would not control.
 
 **Window keys are discovered, not hard-coded.** Claude Code adds and removes
 windows as plans change — model-specific weekly limits come and go, and a
@@ -60,13 +65,15 @@ worth being wrong about.
 - **Some deployments have no limits at all.** API key, Bedrock, Vertex and
   Foundry sessions carry no `rate_limits`. Nothing is written and the provider
   reads as not connected, which is correct.
-- **The exact key names are the least certain part of this document.** They
-  were derived from Claude Code's changelog, which documents `rate_limits` with
-  5-hour and 7-day windows carrying `used_percentage` and `resets_at`, and a
-  `rate_limits.spend_limit` field. The parser is deliberately tolerant of both
-  snake_case and camelCase and of unknown window names for exactly this reason.
-  When you have a captured payload in hand, add it to
-  `Tests/LimitKitTests/Fixtures` and tighten the test around it.
+- **No plan label.** Unlike Codex, the payload carries no subscription tier,
+  so the Claude card shows no plan badge.
+- **Other window kinds are unconfirmed.** The two above were captured live.
+  A `rate_limits.spend_limit` field exists for gateway deployments with spend
+  limits, and model-specific weekly windows come and go with the plan; neither
+  has been seen here. That is why window keys are discovered rather than
+  listed, and why the parser accepts both snake_case and camelCase. If you
+  capture one, add the payload to `Tests/LimitKitTests/Fixtures` and assert
+  against it.
 
 ---
 

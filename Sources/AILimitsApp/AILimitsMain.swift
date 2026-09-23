@@ -47,6 +47,17 @@ enum AILimitsMain {
         // when the menu bar app cannot be clicked. They do their one job and
         // exit without starting any UI.
         switch CommandLine.arguments.dropFirst().first {
+        case "--install-hook":
+            // The menu item does the same thing; this exists so installing is
+            // scriptable and so uninstalling has a symmetric counterpart.
+            do {
+                try ClaudeHookInstaller().install(shimPath: MenuBarController.shimPath())
+                print("Connected Claude Code. Your previous status line still runs.")
+            } catch {
+                FileHandle.standardError.write(Data("\(error.localizedDescription)\n".utf8))
+                exit(1)
+            }
+            return
         case "--uninstall-hook":
             try? ClaudeHookInstaller().uninstall()
             return

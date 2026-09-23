@@ -1,13 +1,13 @@
 {
-  "capturedAt": "2026-09-22T02:14:33Z",
-  "rateLimits": {
-    "five_hour": {
-      "used_percentage": 42.5,
-      "resets_at": "2026-09-22T05:00:00Z"
-    },
-    "seven_day": {
-      "used_percentage": 18,
-      "resets_at": 1790000000
+    "capturedAt": "2026-09-23T00:08:02Z",
+    "rateLimits": {
+        "five_hour": {
+            "resets_at": 1790137800,
+            "used_percentage": 29
+        },
+        "seven_day": {
+            "resets_at": 1790618400,
+            "used_percentage": 5
+        }
     }
-  }
 }
