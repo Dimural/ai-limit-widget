@@ -7,16 +7,21 @@ No more stopping to run `/usage`, and no more finding out you hit a limit by
 being refused mid-task.
 
 ```
-┌─────────────────────────┐   ┌───────────────────────────────────────┐
-│ Claude Code             │   │ Claude Code  max    Codex  plus       │
-│                         │   │ 5-hour  ███████░░░  5-hour  ███░░░░░░ │
-│      68%                │   │            68%                 33%    │
-│ 5-hour                  │   │ 2:03:41                    1:09:12    │
-│ ███████░░░              │   │ Weekly  ██░░░░░░░░  Weekly  █░░░░░░░░ │
-│ 2:03:41                 │   │            24%                  7%    │
-└─────────────────────────┘   └───────────────────────────────────────┘
-        Small                              Medium
+┌──────────────────────┐   ┌────────────────────────────────────────────┐
+│ Claude Code          │   │ Claude Code                     Weekly 24% │
+│                      │   │ 5-hour  ███████████▊─┃──  91%      2:03:20 │
+│  91%                 │   │                                            │
+│ 5-hour window        │   │ Codex                          at 8:06 PM  │
+│                      │   │ 5-hour  ██████████████┃█ 100%        31:40 │
+│ ███████████▊─┃──     │   │                                            │
+│ 2:03:20              │   │ GPT-5.3-Codex-Spark                   plus │
+└──────────────────────┘   │ 5-hour  ▊─────────────┃──   7%      2:30:00│
+         Small             └────────────────────────────────────────────┘
+                                             Medium
 ```
+
+The countdown ticks live. The `┃` on each bar marks where an allowance turns
+critical, so you can see how close you are without reading the number.
 
 The reset countdown ticks live. The percentages update as you work.
 
@@ -78,6 +83,10 @@ alone. Small shows whichever window is closest to running out.
 | **Codex** | Reads the rate limits Codex already writes to its session files after every turn | No |
 | **Claude Code** | Claude Code passes its real usage windows to a status line command; AI Limits wraps yours and reads them | Yes, one setting |
 
+Codex tracks some models under their own allowance — GPT-5.3-Codex-Spark has
+windows of its own — and each gets its own card rather than the most recent
+one winning.
+
 ### The Claude Code setting, in full
 
 Claude Code keeps no live usage figures on disk. The only way to get real ones
@@ -103,13 +112,18 @@ summary instead of a blank one.
 Disconnecting, or `./scripts/uninstall.sh`, puts the original value back and
 leaves every other setting alone.
 
-### One honest limitation
+### Two honest limitations
 
-Claude Code only reports its usage while a session is open. With no session
-running, nothing updates those numbers — so AI Limits **dims the card and
-labels it "as of 9:42 PM"** rather than showing an old figure as if it were
-current. Codex has no such gap; its data is on disk whether it is running or
-not.
+**Claude Code only reports its usage while a session is open.** With no
+session running, nothing refreshes those numbers — so the card says when the
+reading was taken ("at 9:42 PM") instead of presenting it as current. It is
+not faded out: the reading is not broken, it is simply from a known moment.
+
+**A window past its reset time is not shown at all.** Once an allowance rolls
+over, the old percentage describes a window that no longer exists and there is
+no reading of the new one. So a CLI you have not used in a while disappears
+from the widget rather than quoting a number that stopped being true. It
+returns the moment you use it again.
 
 ## Uninstall
 
@@ -122,10 +136,18 @@ backup is left behind for you to delete once you are happy.
 
 ## Not supported
 
-**Gemini CLI** and **Qwen Code** report no server-side usage windows. The only
-number available would be a local request count measured against a quota we
-guessed at, and a confident wrong number is worse than none. If they gain real
-windows, [`docs/adding-a-provider.md`](docs/adding-a-provider.md) is the recipe.
+**ChatGPT.** Its limits are separate from Codex's, and it would be genuinely
+useful to see them — but ChatGPT writes no usage data to disk. Reading them
+would mean taking the OAuth token out of `~/.codex/auth.json` and calling
+OpenAI, which breaks both guarantees above. Codex's own limits are shown
+because Codex writes them locally; ChatGPT's are not because it does not.
+
+**Gemini CLI** and **Qwen Code** report no server-side usage windows at all.
+The only number available would be a local request count measured against a
+quota we guessed at, and a confident wrong number is worse than none.
+
+If any of them start reporting real windows locally,
+[`docs/adding-a-provider.md`](docs/adding-a-provider.md) is the recipe.
 
 ## Contributing
 

@@ -124,7 +124,27 @@ the newest *usable* reading rather than the newest event.
 
 ---
 
+### Named allowances
+
+`limit_id` distinguishes allowances within Codex, and `limit_name` is its
+display name for them. Two have been seen here: `codex` (unnamed, the main
+allowance) and `codex_bengalfox` / "GPT-5.3-Codex-Spark". They live in
+different session files, which is why the reader looks across recent rollouts
+rather than only the newest.
+
+`individual_limit` has been null in every event examined, and `credits` refers
+to purchased credits rather than a window.
+
+---
+
 ## Providers not supported
+
+**ChatGPT** writes no usage data locally. `~/Library/Application Support/`
+`com.openai.chat` holds IDE pairing state and nothing else, and Codex's
+`rate_limits` only ever describes Codex allowances — checked across every
+`rate_limits` event in this machine's session history. ChatGPT's limits are
+real and separate from Codex's, but reading them would require the OAuth token
+in `~/.codex/auth.json` and a network request, which this project does not do.
 
 **Gemini CLI** and **Qwen Code** report no server-side limit windows at all.
 Any figure would be a local request count measured against a quota we guessed,
