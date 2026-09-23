@@ -12,9 +12,14 @@ final class CodexReaderTests: XCTestCase {
         XCTAssertEqual(snapshot.planLabel, "plus")
         XCTAssertEqual(Set(snapshot.windows.map(\.label)), ["5-hour", "Weekly"])
 
+        // The fixture's three events read 9%, 9%, then 10%: the newest wins.
         let fiveHour = try XCTUnwrap(snapshot.windows.first { $0.label == "5-hour" })
-        XCTAssertEqual(fiveHour.usedPercent, 33, accuracy: 0.001)
-        XCTAssertEqual(fiveHour.resetsAt, Date(timeIntervalSince1970: 1_781_855_290))
+        XCTAssertEqual(fiveHour.usedPercent, 10, accuracy: 0.001)
+        XCTAssertEqual(fiveHour.resetsAt, Date(timeIntervalSince1970: 1_783_368_283))
+
+        let weekly = try XCTUnwrap(snapshot.windows.first { $0.label == "Weekly" })
+        XCTAssertEqual(weekly.usedPercent, 2, accuracy: 0.001)
+        XCTAssertEqual(weekly.resetsAt, Date(timeIntervalSince1970: 1_783_955_083))
     }
 
     /// Codex reports only a weekly window on some plans; the 5-hour slot

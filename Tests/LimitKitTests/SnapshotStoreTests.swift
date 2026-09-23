@@ -137,12 +137,14 @@ final class FileTailTests: XCTestCase {
         XCTAssertEqual(try FileTail.lines(of: url), ["one", "two", "three"])
     }
 
-    /// Starting mid-file slices the first line in half, so it is dropped.
+    /// Starting mid-file slices the first line in half, so it is dropped —
+    /// and only it. The complete lines after it must all survive.
     func testDiscardsThePartialLineAtTheStartOfTheWindow() throws {
         let home = try TemporaryHome()
+        // 21 bytes; the last 12 begin part-way through "aaaaaaaaaa".
         let url = try write("aaaaaaaaaa\nbbbb\ncccc\n", in: home)
 
-        XCTAssertEqual(try FileTail.lines(of: url, byteLimit: 12), ["cccc"])
+        XCTAssertEqual(try FileTail.lines(of: url, byteLimit: 12), ["bbbb", "cccc"])
     }
 
     func testEmptyFileYieldsNoLines() throws {
