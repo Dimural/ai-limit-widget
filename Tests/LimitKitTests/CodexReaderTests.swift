@@ -3,8 +3,10 @@ import XCTest
 @testable import LimitKit
 
 final class CodexReaderTests: XCTestCase {
-    /// Before the fixtures' reset times, so their windows read as live.
-    private let whileWindowsAreLive = Date(timeIntervalSince1970: 1_783_300_000)
+    /// Earlier than the soonest reset across every fixture — the named
+    /// allowance's 5-hour window, at 1772439859 — so nothing reads as expired
+    /// and the expiry filter is not what these tests are measuring.
+    private let whileWindowsAreLive = Date(timeIntervalSince1970: 1_772_400_000)
 
     private func onlyAllowance(in lines: [String]) throws -> ProviderSnapshot {
         let byBucket = CodexReader.parse(rolloutLines: lines)
