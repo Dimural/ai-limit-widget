@@ -96,13 +96,14 @@ final class Collector {
         attachWatchers()
 
         let rebuilt = builder.build()
-        let numbersChanged = rebuilt.providers != snapshot.providers
         snapshot = rebuilt
         onUpdate?(rebuilt)
 
-        try? store.write(rebuilt, to: paths.snapshot)
+        // Only writes when something actually changed. This directory is
+        // watched, so writing unconditionally would wake the collector again
+        // and again for as long as the app ran.
+        guard (try? store.writeIfChanged(rebuilt, to: paths.snapshot)) == true else { return }
 
-        guard numbersChanged else { return }
         widgetBridge.push(rebuilt)
         reloadWidgetWithinBudget()
     }

@@ -18,10 +18,11 @@ final class RateLimitParsingTests: XCTestCase {
         let expected = ISO8601DateFormatter().date(from: "2026-08-05T04:19:41Z")
         XCTAssertEqual(RateLimitParsing.resetDate("2026-08-05T04:19:41Z"), expected)
 
-        let fractional = try XCTUnwrap(RateLimitParsing.resetDate("2026-08-05T04:19:41.777Z"))
-        XCTAssertEqual(
-            fractional.timeIntervalSince(try XCTUnwrap(expected)), 0.777, accuracy: 0.001
-        )
+        // Truncated to the second: the snapshot is stored as ISO-8601, which
+        // carries no fractional part, so keeping milliseconds would mean a
+        // timestamp never equalled its own stored form.
+        XCTAssertEqual(RateLimitParsing.resetDate("2026-08-05T04:19:41.777Z"), expected)
+        XCTAssertEqual(RateLimitParsing.resetDate(1_781_855_290.9), Date(timeIntervalSince1970: 1_781_855_290))
     }
 
     func testRejectsUnusableTimestamps() {

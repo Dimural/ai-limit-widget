@@ -29,6 +29,14 @@ public enum RateLimitParsing {
     /// Reads a reset timestamp in any of the shapes providers actually use:
     /// Unix seconds, Unix milliseconds, or an ISO-8601 string.
     ///
+    /// Results are truncated to whole seconds. Usage windows reset on minute
+    /// boundaries, so sub-second precision means nothing here — and keeping it
+    /// actively breaks things: the snapshot is stored as ISO-8601, which has
+    /// no fractional part, so a timestamp carrying milliseconds would never
+    /// compare equal to its own stored form. The collector used that
+    /// comparison to decide whether anything had changed, and so rewrote the
+    /// snapshot every second forever.
+    ///
     /// Values are disambiguated by magnitude: anything at or beyond
     /// `millisecondThreshold` is treated as milliseconds. That boundary sits
     /// far past any plausible seconds-based reset date, so a seconds value can
@@ -40,14 +48,14 @@ public enum RateLimitParsing {
         case let number as NSNumber:
             let value = number.doubleValue
             guard value > 0 else { return nil }
-            return Date(
-                timeIntervalSince1970: value >= millisecondThreshold ? value / 1000 : value
-            )
+            let seconds = value >= millisecondThreshold ? value / 1000 : value
+            return Date(timeIntervalSince1970: seconds.rounded(.down))
         case let string as String:
             if let value = Double(string) {
                 return resetDate(NSNumber(value: value))
             }
-            return isoFormatter.date(from: string) ?? isoFormatterNoFraction.date(from: string)
+            let parsed = isoFormatter.date(from: string) ?? isoFormatterNoFraction.date(from: string)
+            return parsed.map { Date(timeIntervalSince1970: $0.timeIntervalSince1970.rounded(.down)) }
         default:
             return nil
         }

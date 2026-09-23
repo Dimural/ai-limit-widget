@@ -36,7 +36,9 @@ on. It:
   `~/.claude/settings.json` — and only if you ask it to. It is backed up first
   and restored on uninstall.
 - **Costs nothing when idle.** No polling; it sleeps until a CLI writes
-  something.
+  something. Measured on an M-series Mac: **16 MB** of memory, 4 threads, and
+  **0.6% CPU** while a Claude Code session is actively running — lower with
+  nothing open, because nothing wakes it.
 
 These are enforced by `scripts/check-safety.sh`, which the build runs. They are
 checks, not promises.

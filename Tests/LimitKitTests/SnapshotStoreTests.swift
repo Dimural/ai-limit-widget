@@ -159,3 +159,113 @@ final class FileTailTests: XCTestCase {
         XCTAssertThrowsError(try FileTail.lines(of: home.url.appending(path: "absent.txt")))
     }
 }
+
+/// The collector watches the directory it writes into. An unconditional write
+/// retriggers the watcher, which writes again — a loop that rewrote the
+/// snapshot once a second for as long as the app ran, and burned CPU doing it.
+final class RedundantWriteTests: XCTestCase {
+    private func snapshot(codexPercent: Double, generatedAt: Date) -> Snapshot {
+        Snapshot(
+            generatedAt: generatedAt,
+            providers: [
+                ProviderSnapshot(
+                    provider: .codex,
+                    planLabel: "plus",
+                    windows: [LimitWindow(label: "Weekly", usedPercent: codexPercent, resetsAt: nil)],
+                    sourceUpdatedAt: Date(timeIntervalSince1970: 1_790_000_000)
+                )
+            ]
+        )
+    }
+
+    func testFirstWriteAlwaysHappens() throws {
+        let home = try TemporaryHome()
+        let wrote = try SnapshotStore().writeIfChanged(
+            snapshot(codexPercent: 4, generatedAt: Date()), to: home.paths.snapshot
+        )
+        XCTAssertTrue(wrote)
+    }
+
+    /// The loop, reproduced: identical data, only the rebuild time differs.
+    func testIdenticalDataIsNotRewritten() throws {
+        let home = try TemporaryHome()
+        let store = SnapshotStore()
+        try store.writeIfChanged(
+            snapshot(codexPercent: 4, generatedAt: Date(timeIntervalSince1970: 1)),
+            to: home.paths.snapshot
+        )
+        let firstModified = try modificationDate(of: home.paths.snapshot)
+
+        for second in 2...5 {
+            let wrote = try store.writeIfChanged(
+                snapshot(codexPercent: 4, generatedAt: Date(timeIntervalSince1970: TimeInterval(second))),
+                to: home.paths.snapshot
+            )
+            XCTAssertFalse(wrote, "A rebuild with the same numbers must not touch the file")
+        }
+
+        XCTAssertEqual(try modificationDate(of: home.paths.snapshot), firstModified)
+    }
+
+    func testRealChangesStillGetWritten() throws {
+        let home = try TemporaryHome()
+        let store = SnapshotStore()
+        try store.writeIfChanged(snapshot(codexPercent: 4, generatedAt: Date()), to: home.paths.snapshot)
+
+        let wrote = try store.writeIfChanged(
+            snapshot(codexPercent: 5, generatedAt: Date()), to: home.paths.snapshot
+        )
+
+        XCTAssertTrue(wrote)
+        XCTAssertEqual(
+            store.read(from: home.paths.snapshot)?.providers.first?.windows.first?.usedPercent, 5
+        )
+    }
+
+    /// A corrupt or truncated file must be replaced, not mistaken for a match.
+    func testUnreadableExistingFileIsOverwritten() throws {
+        let home = try TemporaryHome()
+        try home.write("{ not json", to: "Library/Application Support/AILimits/snapshot.json")
+
+        let wrote = try SnapshotStore().writeIfChanged(
+            snapshot(codexPercent: 4, generatedAt: Date()), to: home.paths.snapshot
+        )
+
+        XCTAssertTrue(wrote)
+    }
+
+    private func modificationDate(of url: URL) throws -> Date {
+        try XCTUnwrap(
+            try FileManager.default.attributesOfItem(atPath: url.path)[.modificationDate] as? Date
+        )
+    }
+}
+
+/// Storing a snapshot must not change it. The collector compares what it
+/// rebuilt against what is on disk to decide whether anything happened, so any
+/// detail lost in encoding turns every rebuild into a spurious change.
+final class RoundTripFidelityTests: XCTestCase {
+    func testASnapshotBuiltFromRealFixturesSurvivesStorageUnchanged() throws {
+        let home = try TemporaryHome()
+        try home.write(
+            String(decoding: try Fixture.data("claude-capture-two-windows.json"), as: UTF8.self),
+            to: "Library/Application Support/AILimits/claude.json"
+        )
+        // This fixture's event timestamps carry milliseconds, which is exactly
+        // what ISO-8601 storage used to discard.
+        try home.write(
+            try Fixture.lines("codex-both-windows.jsonl").joined(separator: "\n"),
+            to: ".codex/sessions/2026/09/22/rollout-x.jsonl"
+        )
+
+        let built = SnapshotBuilder(paths: home.paths).build()
+        let store = SnapshotStore()
+        try store.write(built, to: home.paths.snapshot)
+
+        let loaded = try XCTUnwrap(store.read(from: home.paths.snapshot))
+        XCTAssertEqual(loaded.providers, built.providers)
+
+        // And therefore the collector sees no change and does not rewrite.
+        XCTAssertFalse(try store.writeIfChanged(built, to: home.paths.snapshot))
+    }
+}

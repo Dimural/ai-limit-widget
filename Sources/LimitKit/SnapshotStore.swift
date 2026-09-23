@@ -27,6 +27,26 @@ public struct SnapshotStore {
         try Self.writeAtomically(data: Self.encoder.encode(snapshot), to: url)
     }
 
+    /// Writes only when the numbers differ from what is already on disk, and
+    /// reports whether it did.
+    ///
+    /// The collector watches the directory it writes into, so an
+    /// unconditional write retriggers the watcher, which writes again, for as
+    /// long as the app is running. Comparing before writing breaks that loop
+    /// at its source: a write still happens whenever there is genuinely
+    /// something new, and the refresh it provokes simply finds nothing to do.
+    ///
+    /// `generatedAt` is ignored in the comparison — it changes on every
+    /// rebuild by definition, so including it would defeat the whole point.
+    @discardableResult
+    public func writeIfChanged(_ snapshot: Snapshot, to url: URL) throws -> Bool {
+        if let existing = read(from: url), existing.providers == snapshot.providers {
+            return false
+        }
+        try write(snapshot, to: url)
+        return true
+    }
+
     /// Returns `nil` for a missing, unreadable, corrupt, or future-versioned
     /// file. Every one of those is a "no data yet" state in the UI, which is
     /// always better than rendering a number we are not sure of.
