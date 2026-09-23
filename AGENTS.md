@@ -24,10 +24,15 @@ build — they are not style preferences.
 
 Two more rules are not mechanically checkable, so they are on you:
 
-- **Never show a stale number as if it were live.** Claude Code only reports
-  limits while a session is open, so its data goes stale as a matter of course.
-  The UI dims and dates it instead. `Presentation.stalenessThreshold` is the
-  boundary.
+- **Never show a number as if it were live when it is not.** Claude Code only
+  reports limits while a session is open, so its data goes stale as a matter
+  of course; the card says when the reading was taken.
+  `Presentation.stalenessThreshold` is the boundary. Say it in words, not by
+  fading the card — a dimmed reading looks like a broken one, which is exactly
+  the bug that fading caused.
+- **A window past its reset time is not a reading.** The allowance has rolled
+  over and we have no measurement of the new one, so expired windows are
+  dropped rather than quoted. See `LimitWindow.hasReset`.
 - **A provider with no data is absent, not zero.** An empty bar reads as
   "plenty left", which is the opposite of the truth. Readers return `nil`.
 
@@ -48,6 +53,9 @@ reader.
 ```
 Sources/LimitKit/         Data layer. No AppKit, no WidgetKit, no network.
                           Everything here is unit tested.
+Sources/LimitUI/          SwiftUI views shared by the widget and the preview
+                          renderer. Kept out of the extension so they can be
+                          drawn to an image and looked at.
 Sources/StatusLineShim/   Tiny binary Claude Code runs on every render.
                           Logic lives in LimitKit/StatusLineCapture.swift.
 Sources/AILimitsApp/      Menu bar app. The collector; the process that stays
@@ -111,10 +119,19 @@ make uninstall  remove the app, its data, and the Claude Code hook
 Useful while working:
 
 ```
+make app && ./AILimits.app/Contents/MacOS/AILimits --render-preview /tmp/ui.png
 ./AILimits.app/Contents/MacOS/AILimits --print-snapshot   # what the widget sees
 pluginkit -m -p com.apple.widgetkit-extension | grep -i ailimits   # is it registered
 echo '<payload>' | ./AILimits.app/Contents/Resources/ai-limits-statusline
 ```
+
+**Look at the UI before you claim it works.** `--render-preview` draws the
+real menu rows to `/tmp/ui.png` and the real widget layouts to
+`/tmp/ui.widgets.png`, both light and dark, using sample readings that cover
+the states live data rarely shows at the moment you look: exhausted, past the
+warning notch, and no longer current. Open the images. Reviewing a visual
+change by reading the diff does not work, and this is the whole reason the
+SwiftUI views live in `LimitUI` rather than inside the widget extension.
 
 ## Requirements
 

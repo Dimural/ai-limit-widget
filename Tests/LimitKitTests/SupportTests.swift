@@ -107,6 +107,43 @@ final class PresentationTests: XCTestCase {
         XCTAssertEqual(Presentation.compactCountdown(until: now.addingTimeInterval(-60), from: now), "now")
     }
 
+    /// "resets in now" is nonsense, and an allowance past its reset time is
+    /// rolling over rather than counting down to anything.
+    func testResetPhrasing() {
+        let now = Date(timeIntervalSince1970: 1_000_000)
+        func window(_ offset: TimeInterval?) -> LimitWindow {
+            LimitWindow(
+                label: "5-hour", usedPercent: 50,
+                resetsAt: offset.map { now.addingTimeInterval($0) }
+            )
+        }
+
+        XCTAssertEqual(Presentation.resetPhrase(for: window(8100), asOf: now), "resets in 2h 15m")
+        XCTAssertEqual(Presentation.resetPhrase(for: window(-60), asOf: now), "resetting now")
+        XCTAssertEqual(Presentation.resetPhrase(for: window(0), asOf: now), "resetting now")
+        XCTAssertEqual(
+            Presentation.resetPhrase(for: window(nil), asOf: now), "no reset time reported"
+        )
+    }
+
+    /// The menu bar and the widget build their colours from these numbers, so
+    /// a reading can never look one way in one place and another elsewhere.
+    func testEverySeverityHasADistinctInk() {
+        let inks = Presentation.Severity.allSeverities.map(Presentation.ink(for:))
+        XCTAssertEqual(Set(inks).count, inks.count)
+    }
+
+    /// Dark backgrounds wash out the deeper tones, so each is lifted — but
+    /// lifting must not push a colour out of range.
+    func testLiftedInksStayInRange() {
+        for severity in Presentation.Severity.allSeverities {
+            let lifted = Presentation.ink(for: severity).lifted
+            for channel in [lifted.red, lifted.green, lifted.blue] {
+                XCTAssertTrue((0...1).contains(channel), "\(severity) lifted out of range")
+            }
+        }
+    }
+
     func testStalenessIsMeasuredFromTheProvidersOwnTimestamp() {
         let snapshot = ProviderSnapshot(
             provider: .claude,

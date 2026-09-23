@@ -65,7 +65,10 @@ fi
 # Writes are funnelled through SnapshotStore.writeAtomically. Anything else
 # reaching for a write API is a new, unreviewed way to touch the disk.
 write_apis='\.write\(to:|createFile\(atPath:|removeItem\(at:|moveItem\(at:|copyItem\(at:|replaceItemAt\('
-allowed_writers='Sources/LimitKit/SnapshotStore.swift|Sources/LimitKit/ClaudeHookInstaller.swift'
+# PreviewRenderer is exempt, and narrowly: it runs only from
+# `AILimits --render-preview <path>`, writes only that PNG, and nothing in
+# the running app ever calls it.
+allowed_writers='Sources/LimitKit/SnapshotStore.swift|Sources/LimitKit/ClaudeHookInstaller.swift|Sources/AILimitsApp/PreviewRenderer.swift'
 if matches=$(grep_code "$write_apis" $(sources | grep -vE "$allowed_writers")); then
 	fail "Filesystem write outside SnapshotStore/ClaudeHookInstaller" \
 		"Route writes through SnapshotStore.writeAtomically so they stay atomic and private." \

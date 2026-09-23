@@ -61,6 +61,28 @@ enum AILimitsMain {
         case "--uninstall-hook":
             try? ClaudeHookInstaller().uninstall()
             return
+        case "--render-preview":
+            // Draws the menu to a PNG so a visual change can be checked
+            // without a person having to look at the screen.
+            // Always the sample, never live data: it deliberately covers
+            // states real readings rarely reach at the moment you look —
+            // exhausted, past the notch, and no longer current.
+            let path = CommandLine.arguments.dropFirst(2).first ?? "menu-preview.png"
+            do {
+                try PreviewRenderer.render(
+                    PreviewRenderer.sampleSnapshot, to: URL(fileURLWithPath: path)
+                )
+                try PreviewRenderer.renderWidgets(
+                    PreviewRenderer.sampleSnapshot,
+                    to: URL(fileURLWithPath: path).deletingPathExtension()
+                        .appendingPathExtension("widgets.png")
+                )
+                print("Wrote \(path)")
+            } catch {
+                FileHandle.standardError.write(Data("\(error.localizedDescription)\n".utf8))
+                exit(1)
+            }
+            return
         case "--print-snapshot":
             // For debugging and for agents: the exact data the widget renders.
             if let data = try? Data(contentsOf: Paths().snapshot) {

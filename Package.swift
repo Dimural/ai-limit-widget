@@ -10,6 +10,7 @@ let package = Package(
     platforms: [.macOS(.v14)],
     products: [
         .library(name: "LimitKit", targets: ["LimitKit"]),
+        .library(name: "LimitUI", targets: ["LimitUI"]),
         .executable(name: "ai-limits-statusline", targets: ["StatusLineShim"]),
         .executable(name: "AILimits", targets: ["AILimitsApp"]),
         .executable(name: "AILimitsWidget", targets: ["AILimitsWidget"]),
@@ -19,14 +20,19 @@ let package = Package(
         // No AppKit, no WidgetKit, no networking. Fully unit tested.
         .target(name: "LimitKit"),
 
+        // Shared SwiftUI views. Lives apart from the widget extension so the
+        // menu bar app can render the widget's layouts to an image, which is
+        // the only way to review them without looking at a desktop.
+        .target(name: "LimitUI", dependencies: ["LimitKit"]),
+
         // Tiny binary wired into Claude Code's status line.
         .executableTarget(name: "StatusLineShim", dependencies: ["LimitKit"]),
 
         // Menu bar app: collector, settings, widget bridge.
-        .executableTarget(name: "AILimitsApp", dependencies: ["LimitKit"]),
+        .executableTarget(name: "AILimitsApp", dependencies: ["LimitKit", "LimitUI"]),
 
         // WidgetKit extension: renders the snapshot pushed into its container.
-        .executableTarget(name: "AILimitsWidget", dependencies: ["LimitKit"]),
+        .executableTarget(name: "AILimitsWidget", dependencies: ["LimitKit", "LimitUI"]),
 
         .testTarget(
             name: "LimitKitTests",
